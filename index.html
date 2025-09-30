@@ -101,6 +101,18 @@
       cursor: pointer;
       transition: box-shadow 0.2s, background 0.2s;
     }
+    @media (max-width: 600px) {
+      .btn-neon {
+        font-size: 0.85rem;
+        padding: 0.5rem 0.7rem;
+      }
+      .param-grid {
+        font-size: 0.85rem;
+      }
+      .card-glass {
+        padding: 0.5rem;
+      }
+    }
     .btn-neon:hover, .btn-neon:focus {
       background: rgba(39,255,20,0.12);
       box-shadow: 0 0 24px #39ff14, 0 0 48px #00d2ff;
@@ -229,6 +241,11 @@
       ctx.save();
       // Mirroring solo si cámara frontal
       if (cameraMode === 'user') {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
+      // Ajuste especial para móvil y cámara posterior
+      if (cameraMode === 'environment' && window.innerWidth < 700) {
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
       }
