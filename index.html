@@ -194,6 +194,12 @@
       faceStream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360, facingMode: cameraMode } });
       video.srcObject = faceStream;
       await video.play();
+      // Ajustar mirroring del video según cámara
+      if (cameraMode === 'user') {
+        video.style.transform = 'scaleX(-1)';
+      } else {
+        video.style.transform = 'none';
+      }
       detecting = true;
       startBtn.disabled = true;
       stopBtn.disabled = false;
@@ -218,8 +224,14 @@
     // Detección facial y parámetros
     async function detectLoop() {
       if (!detecting || !faceModel) return;
-      const faces = await faceModel.estimateFaces({ input: video, returnTensors: false, flipHorizontal: cameraMode === 'user' });
+      const faces = await faceModel.estimateFaces({ input: video, returnTensors: false, flipHorizontal: false });
       ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.save();
+      // Mirroring solo si cámara frontal
+      if (cameraMode === 'user') {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
       if (faces.length > 0) {
         const face = faces[0];
         const landmarks = face.scaledMesh || face.keypoints;
@@ -275,6 +287,7 @@
           if (document.getElementById(id)) document.getElementById(id).textContent = params[k] || 0;
         });
       }
+      ctx.restore();
       setTimeout(detectLoop, 200);
     }
 
