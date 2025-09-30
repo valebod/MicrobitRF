@@ -191,21 +191,25 @@
     let sendCounter = 0;
     let cameraMode = 'user';
 
-    // Cargar modelo facial
-    async function loadFaceModel() {
+    // Cargar modelo facial y activar cámara automáticamente
+    async function loadFaceModelAndCamera() {
       faceModel = await faceLandmarksDetection.load(
         faceLandmarksDetection.SupportedPackages.mediapipeFacemesh,
         { maxFaces: 1, refineLandmarks: false }
       );
       startBtn.disabled = false;
+      await startDetection();
     }
-    loadFaceModel();
+    loadFaceModelAndCamera();
 
     // Activar cámara y detección
     async function startDetection() {
       faceStream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360, facingMode: cameraMode } });
       video.srcObject = faceStream;
       await video.play();
+      // Ajustar tamaño del canvas al video real
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
       // Ajustar mirroring del video según cámara
       if (cameraMode === 'user') {
         video.style.transform = 'scaleX(-1)';
@@ -246,8 +250,9 @@
       }
       // Ajuste especial para móvil y cámara posterior
       if (cameraMode === 'environment' && window.innerWidth < 700) {
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
+        // En móvil, la cámara posterior no debe espejarse, pero algunos dispositivos lo hacen por defecto.
+        // Para corregir el desfase, NO aplicar mirroring extra aquí.
+        // Si el video se ve invertido, ajustar solo el video.style.transform, no el canvas.
       }
       if (faces.length > 0) {
         const face = faces[0];
