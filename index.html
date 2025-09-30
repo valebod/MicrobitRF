@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teachable Machine + micro:bit</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      min-height: 100vh;
+      margin: 0;
+      font-family: 'Montserrat', 'Roboto', Arial, sans-serif;
+      background: linear-gradient(135deg, #232946 0%, #3f2c6e 100%);
+      color: #e0e0e0;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+    @media (min-width: 900px) {
+      .container {
+        flex-direction: row;
+        gap: 2rem;
+        align-items: flex-start;
+        justify-content: center;
+      }
+    }
+    .camera-panel {
+      flex: 2 1 480px;
+      min-width: 320px;
+      max-width: 640px;
+    }
+    .data-panel {
+      flex: 1 1 320px;
+      min-width: 280px;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .card-glass {
+      background: rgba(44, 62, 80, 0.6);
+      border-radius: 14px;
+      box-shadow: 0 4px 16px rgba(39,255,20,0.10);
+      border: 1.2px solid rgba(39,255,20,0.18);
+      backdrop-filter: blur(6px);
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .param-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    @media (min-width: 600px) {
+      .param-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+    @media (min-width: 900px) {
+      .param-grid { grid-template-columns: repeat(6, 1fr); }
+    }
+    .param-card {
+      background: rgba(44,62,80,0.7);
+      border-radius: 8px;
+      box-shadow: 0 1px 4px #00d2ff44;
+      border: 1px solid #00d2ff88;
+      padding: 0.4rem 0.2rem;
+      text-align: center;
+      min-width: 0;
+    }
+    .param-label {
+      font-weight: 600;
+      color: #39ff14;
+      font-size: 0.85rem;
+      margin-bottom: 0.1rem;
+      letter-spacing: 0.5px;
+    }
+    .param-value {
+      font-family: 'Roboto Mono', 'Courier New', monospace;
+      font-weight: bold;
+      color: #e0e0e0;
+      font-size: 0.95rem;
+      background: none;
+      border: none;
+      padding: 0.1rem 0;
+      margin-top: 0.05rem;
+    }
+    .btn-neon {
+      background: transparent;
+      color: #39ff14;
+      border: 2px solid #39ff14;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      padding: 0.75rem 2rem;
+      box-shadow: 0 0 8px #39ff14, 0 0 24px #00d2ff;
+      cursor: pointer;
+      transition: box-shadow 0.2s, background 0.2s;
+    }
+    .btn-neon:hover, .btn-neon:focus {
+      background: rgba(39,255,20,0.12);
+      box-shadow: 0 0 24px #39ff14, 0 0 48px #00d2ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="camera-panel">
+      <div class="card-glass" style="padding:0.5rem 0.5rem 1.5rem 0.5rem; display:flex; flex-direction:column; align-items:center;">
+        <div style="position:relative; width:100%; max-width:480px; margin:0 auto;">
+          <video id="video" width="480" height="360" autoplay playsinline style="width:100%; max-width:480px; border-radius:16px; box-shadow:0 0 24px #00d2ff;"></video>
+          <canvas id="canvas" width="480" height="360" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></canvas>
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-top:1rem;width:100%;max-width:480px;">
+          <button id="startBtn" class="btn-neon" style="flex:1;" disabled>▶️ Iniciar Detección</button>
+          <button id="stopBtn" class="btn-neon" style="flex:1;" disabled>⏹️ Detener</button>
+          <button id="toggleCameraBtn" class="btn-neon" style="flex:1;">🔄 Cambiar cámara</button>
+        </div>
+      </div>
+    </div>
+    <div class="data-panel">
+      <div class="card-glass">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+          <span id="statusBadge" style="font-weight:bold;">Desconectado</span>
+          <button id="connectBtn" class="btn-neon" style="min-width:140px;">🔗 Conectar al Micro:bit</button>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:0.5rem;font-size:0.98rem;">
+          <div>Enviados: <span id="sendCount">0</span></div>
+        </div>
+        <div id="feedback" style="margin-bottom:0.5rem;display:flex;flex-wrap:wrap;gap:0.5rem;max-height:40px;overflow-y:auto;"></div>
+      </div>
+      <div class="card-glass">
+        <div class="param-grid">
+          <div class="param-card"><span class="param-label">Ubicación X</span><div class="param-value" id="xValue">0</div></div>
+          <div class="param-card"><span class="param-label">Ubicación Y</span><div class="param-value" id="yValue">0</div></div>
+          <div class="param-card"><span class="param-label">Distancia</span><div class="param-value" id="zValue">0</div></div>
+          <div class="param-card"><span class="param-label">Giro Yaw</span><div class="param-value" id="yawValue">0</div></div>
+          <div class="param-card"><span class="param-label">Inclinación Pitch</span><div class="param-value" id="pitchValue">0</div></div>
+          <div class="param-card"><span class="param-label">Rotación Roll</span><div class="param-value" id="rollValue">0</div></div>
+          <div class="param-card"><span class="param-label">Boca</span><div class="param-value" id="mouthValue">0</div></div>
+          <div class="param-card"><span class="param-label">Ojo Izquierdo</span><div class="param-value" id="leftEyeValue">0</div></div>
+          <div class="param-card"><span class="param-label">Ojo Derecho</span><div class="param-value" id="rightEyeValue">0</div></div>
+          <div class="param-card"><span class="param-label">Sonrisa</span><div class="param-value" id="smileValue">0</div></div>
+          <div class="param-card"><span class="param-label">Visible</span><div class="param-value" id="faceVisible">0</div></div>
+          <div class="param-card"><span class="param-label">Estado</span><div class="param-value" id="faceStatus">No</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@0.0.1/dist/face-landmarks-detection.min.js"></script>
+  <script>
+    // Elementos
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const toggleCameraBtn = document.getElementById('toggleCameraBtn');
+    const connectBtn = document.getElementById('connectBtn');
+    const statusBadge = document.getElementById('statusBadge');
+    const sendCount = document.getElementById('sendCount');
+    const feedback = document.getElementById('feedback');
+    // Parámetros faciales
+    const paramIds = {
+      x: 'xValue', y: 'yValue', z: 'zValue', yaw: 'yawValue', pitch: 'pitchValue', roll: 'rollValue',
+      mouth: 'mouthValue', leftEye: 'leftEyeValue', rightEye: 'rightEyeValue', smile: 'smileValue',
+      visible: 'faceVisible', status: 'faceStatus'
+    };
+    let faceModel = null;
+    let faceStream = null;
+    let detecting = false;
+    let microbit = { device: null, server: null, service: null, txChar: null, connected: false };
+    let params = { x:0, y:0, z:0, yaw:0, pitch:0, roll:0, mouth:0, leftEye:0, rightEye:0, smile:0, visible:0 };
+    let sendCounter = 0;
+    let cameraMode = 'user';
+
+    // Cargar modelo facial
+    async function loadFaceModel() {
+      faceModel = await faceLandmarksDetection.load(
+        faceLandmarksDetection.SupportedPackages.mediapipeFacemesh,
+        { maxFaces: 1, refineLandmarks: false }
+      );
+      startBtn.disabled = false;
+    }
+    loadFaceModel();
+
+    // Activar cámara y detección
+    async function startDetection() {
+      faceStream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360, facingMode: cameraMode } });
+      video.srcObject = faceStream;
+      await video.play();
+      detecting = true;
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      detectLoop();
+    }
+    startBtn.onclick = startDetection;
+    stopBtn.onclick = () => {
+      detecting = false;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      if (faceStream) { faceStream.getTracks().forEach(t => t.stop()); }
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+    };
+    toggleCameraBtn.onclick = () => {
+      cameraMode = (cameraMode === 'user') ? 'environment' : 'user';
+      if (detecting) {
+        stopBtn.onclick();
+        startDetection();
+      }
+    };
+
+    // Detección facial y parámetros
+    async function detectLoop() {
+      if (!detecting || !faceModel) return;
+      const faces = await faceModel.estimateFaces({ input: video, returnTensors: false, flipHorizontal: cameraMode === 'user' });
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      if (faces.length > 0) {
+        const face = faces[0];
+        const landmarks = face.scaledMesh || face.keypoints;
+        // Dibujar puntos
+        ctx.fillStyle = '#00ff00';
+        landmarks.forEach(p => { ctx.beginPath(); ctx.arc(p[0], p[1], 2, 0, 2*Math.PI); ctx.fill(); });
+        // Calcular parámetros
+        const xs = landmarks.map(p => p[0]);
+        const ys = landmarks.map(p => p[1]);
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+        const minY = Math.min(...ys), maxY = Math.max(...ys);
+        const centerX = (minX + maxX)/2, centerY = (minY + maxY)/2;
+        const width = maxX - minX, height = maxY - minY;
+        params.x = Math.round((centerX / video.videoWidth) * 99);
+        params.y = Math.round((centerY / video.videoHeight) * 99);
+        params.z = Math.round((width * height) / (video.videoWidth * video.videoHeight) * 99);
+        // Rotación
+        const noseTip = landmarks[1] || landmarks[0];
+        params.yaw = Math.round(50 + (noseTip[0] - centerX) / width * 50);
+        params.pitch = Math.round(50 + (noseTip[1] - centerY) / height * 50);
+        params.roll = 5;
+        // Boca
+        const upperLip = landmarks[13], lowerLip = landmarks[14];
+        if (upperLip && lowerLip) {
+          const mouthOpen = Math.abs(lowerLip[1] - upperLip[1]);
+          params.mouth = Math.min(99, Math.round(mouthOpen / 2));
+        }
+        // Ojos
+        const leftEyeTop = landmarks[159], leftEyeBottom = landmarks[145];
+        const rightEyeTop = landmarks[386], rightEyeBottom = landmarks[374];
+        if (leftEyeTop && leftEyeBottom && rightEyeTop && rightEyeBottom) {
+          params.leftEye = Math.min(99, Math.round(Math.abs(leftEyeBottom[1] - leftEyeTop[1]) / 2));
+          params.rightEye = Math.min(99, Math.round(Math.abs(rightEyeBottom[1] - rightEyeTop[1]) / 2));
+        }
+        // Sonrisa
+        const leftMouth = landmarks[61], rightMouth = landmarks[291];
+        if (leftMouth && rightMouth) {
+          const smileWidth = Math.abs(rightMouth[0] - leftMouth[0]);
+          params.smile = Math.min(9, Math.round(smileWidth / 20));
+        }
+        params.visible = 1;
+        params.status = 'Sí';
+        // Mostrar parámetros
+        Object.entries(paramIds).forEach(([k,id]) => {
+          if (document.getElementById(id)) document.getElementById(id).textContent = params[k] || 0;
+        });
+        // Enviar a micro:bit si está conectado
+        if (microbit.connected && microbit.txChar) sendToMicrobit();
+      } else {
+        params.visible = 0;
+        params.status = 'No';
+        Object.entries(paramIds).forEach(([k,id]) => {
+          if (document.getElementById(id)) document.getElementById(id).textContent = params[k] || 0;
+        });
+      }
+      setTimeout(detectLoop, 200);
+    }
+
+    // Conexión/desconexión micro:bit
+    connectBtn.onclick = async () => {
+      if (!microbit.connected) {
+        statusBadge.textContent = 'Conectando...';
+        connectBtn.disabled = true;
+        try {
+          microbit.device = await navigator.bluetooth.requestDevice({
+            filters: [{ namePrefix: "BBC micro:bit" }],
+            optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
+          });
+          microbit.server = await microbit.device.gatt.connect();
+          microbit.service = await microbit.server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+          microbit.txChar = await microbit.service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+          microbit.connected = true;
+          statusBadge.textContent = 'Conectado';
+          connectBtn.textContent = '🔌 Desconectar';
+          connectBtn.disabled = false;
+        } catch (e) {
+          statusBadge.textContent = 'Error';
+          connectBtn.disabled = false;
+          alert('Error al conectar: ' + e.message);
+        }
+      } else {
+        if (microbit.server) microbit.server.disconnect();
+        microbit.connected = false;
+        statusBadge.textContent = 'Desconectado';
+        connectBtn.textContent = '🔗 Conectar al Micro:bit';
+      }
+    };
+
+    // Enviar datos a micro:bit
+    function sendToMicrobit() {
+      try {
+        const cmd =
+          pad(params.x) + pad(params.y) + pad(params.z) + pad(params.yaw) + pad(params.pitch) + pad(params.mouth) +
+          pad(params.leftEye) + pad(params.rightEye) + Math.floor(params.roll/10) + params.smile + params.visible + '\n';
+        const encoder = new TextEncoder();
+        microbit.txChar.writeValue(encoder.encode(cmd));
+        sendCounter++;
+        sendCount.textContent = sendCounter;
+        addFeedback(cmd.trim());
+      } catch (e) {
+        addFeedback('Error');
+      }
+    }
+    function pad(n) { return String(Math.floor(n)).padStart(2,'0'); }
+    function addFeedback(cmd) {
+      const el = document.createElement('div');
+      el.textContent = cmd;
+      el.className = 'feedback-item';
+      feedback.appendChild(el);
+      while (feedback.children.length > 3) feedback.removeChild(feedback.firstChild);
+    }
+  </script>
+</body>
+</html>
